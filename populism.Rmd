@@ -16,11 +16,94 @@ library(rstanarm)
 # people. We are interested to see if two variables might be associated with
 # move_to_pop: treatment and age.
 
+#What is the causal effect of the treatment on the probability of becoming more populist?
+#epred
+
+#Wisdom - look at data
+
+
+
+#Justice - representativeness and population
+#limit of people who use public transportation in Boston Area - valid for 
+#population of commuters
+#age- youngest person was 20 oldest was 68
+#randomly sampled (good)
+#small amount of observations
+
+
+
+
 x <- trains %>% 
   mutate(move_to_pop = ifelse(att_end >= att_start + 1, TRUE, FALSE)) %>% 
   select(move_to_pop, treatment, age)
+
+#courage- fit a model
+
+ train_fit <- stan_glm(data = x,
+                      formula = move_to_pop ~ treatment,
+                      family = binomial,
+                      refresh = 0,
+                      seed = 65)
+ # put the variable we are trying to predict on the left hand side
+ train_fit
+ 
+ #since this is not a linear model these numbers aren't as important- summaries of posterior #distributions of the model
 ```
 
+
+```{r setup, include=FALSE}
+newobs <- tibble(treatment = c("Treated", "Control"))
+ #newobs needs to be the thing on the right side
+# number of rows in newobs shows you how many things you want information on
+#use posterior-Epred for anything else
+#trying to predict for small group of people 
+
+pe <-  posterior_epred(train_fit, 
+                 newdata = newobs) %>% 
+   as_tibble() %>% 
+   mutate(ate = `1` - `2`)
+
+pe %>% 
+  ggplot(aes(x = ate)) +
+    geom_histogram(aes(y = after_stat(count/sum(count))),
+                   bins = 100)  +
+    labs(title = "Posterior Distribution for the Probability of Causal Effect
+         of the treatment on the probability of becoming more populist",
+         subtitle = "",
+         x = "Probability of the Causal Effect of the Treatment",
+         y = "Probability") +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_classic()
+
+#there's a 10 -25 % chance that the treatment causes units to become more populist
+```
+
+```{r}
+#If we assign the treatment to 25 people, how many will become more populist?
+
+newobs1 <- tibble(treatment = c(rep("Treated", 25)))
+                  
+pp <- posterior_predict(train_fit, 
+                        newdata = newobs1) %>% 
+  as_tibble() %>% 
+  mutate_all(as.numeric) %>% 
+  rowwise() %>% 
+  mutate(total = sum(c_across()))
+
+pp %>% 
+  ggplot(aes(x = total)) +
+  geom_histogram(aes(y = after_stat(count/sum(count))),
+                   bins = 100)  +
+    labs(title = "Posterior for Number of Indivuals in a group of 25 who
+         Become More Populist",
+         subtitle = "Likely 8-10 people will become populist",
+         x = "Number of New Populists",
+         y = "Probability") +
+    scale_x_continuous(labels = scales::number_format(accuracy = 1)) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_classic()
+```
 
 
 
